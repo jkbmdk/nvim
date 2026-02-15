@@ -1,28 +1,192 @@
+-- https://github.com/nvim-treesitter/nvim-treesitter
+
+local branch = 'main'
+
+--- Register parsers from opts.ensure_installed
+local function register(ensure_installed)
+  for filetype, parser in pairs(ensure_installed) do
+    local filetypes = vim.treesitter.language.get_filetypes(parser)
+    if not vim.tbl_contains(filetypes, filetype) then
+      table.insert(filetypes, filetype)
+    end
+
+    -- register and start parsers for filetypes
+    vim.treesitter.language.register(parser, filetypes)
+  end
+end
+
+--- Install and start parsers for nvim-treesitter.
+local function install_and_start()
+  -- Auto-install and start treesitter parser for any buffer with a registered filetype
+  vim.api.nvim_create_autocmd({ 'BufWinEnter' }, {
+    callback = function(event)
+      local bufnr = event.buf
+      local filetype = vim.api.nvim_get_option_value('filetype', { buf = bufnr })
+
+      -- Skip if no filetype
+      if filetype == '' then
+        return
+      end
+
+      -- Get parser name based on filetype
+      local parser_name = vim.treesitter.language.get_lang(filetype) -- WARNING: might return filetype (not helpful)
+      if not parser_name then
+        -- vim.notify(
+        --   "Filetype " .. vim.inspect(filetype) .. " has no parser registered",
+        --   vim.log.levels.WARN,
+        --   { title = "core/treesitter" }
+        -- )
+        return
+      end
+
+      -- vim.notify(
+      --   vim.inspect("Successfully got parser " .. parser_name .. " for filetype " .. filetype),
+      --   vim.log.levels.DEBUG,
+      --   { title = "core/treesitter" }
+      -- )
+
+      -- Check if parser_name is available in parser configs
+      local parser_configs = require 'nvim-treesitter.parsers'
+      if not parser_configs[parser_name] then
+        -- vim.notify(
+        --   "Parser config does not have parser " .. vim.inspect(parser_name) .. ", skipping",
+        --   vim.log.levels.WARN,
+        --   { title = "core/treesitter" }
+        -- )
+        return -- Parser not ailable, skip silently
+      end
+
+      local parser_installed = pcall(vim.treesitter.get_parser, bufnr, parser_name)
+
+      -- If not installed, install parser synchronously
+      if not parser_installed then
+        require('nvim-treesitter').install({ parser_name }):wait(30000)
+        -- vim.notify("Installed parser: " .. parser_name, vim.log.levels.INFO, { title = "core/treesitter" })
+      end
+
+      -- Check so tree-sitter can see the newly installed parser
+      parser_installed = pcall(vim.treesitter.get_parser, bufnr, parser_name)
+      if not parser_installed then
+        vim.notify('Failed to get parser for ' .. parser_name .. ' after installation', vim.log.levels.WARN, { title = 'core/treesitter' })
+        return
+      end
+
+      -- Start treesitter for this buffer
+      vim.treesitter.start(bufnr, parser_name)
+    end,
+  })
+end
+
+local function set_foldexpr()
+  vim.wo.foldmethod = 'expr'
+  vim.wo.foldexpr = 'v:lua.vim.treesitter.foldexpr()'
+  vim.wo.foldlevel = 99
+end
+
+local function set_indentexpr()
+  vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+end
+
 return {
-  { -- Highlight, edit, and navigate code
+  {
     'nvim-treesitter/nvim-treesitter',
+    branch = branch,
+    lazy = false,
     build = ':TSUpdate',
-    main = 'nvim-treesitter.configs', -- Sets main module to use for opts
-    -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
-    opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc', 'go' },
-      -- Autoinstall languages that are not installed
-      auto_install = true,
-      highlight = {
-        enable = true,
-        -- Some languages depend on vim's regex highlighting system (such as Ruby) for indent rules.
-        --  If you are experiencing weird indenting issues, add the language to
-        --  the list of additional_vim_regex_highlighting and disabled languages for indent.
-        additional_vim_regex_highlighting = { 'ruby' },
-      },
-      indent = { enable = true, disable = { 'ruby' } },
+    dependencies = {
+      'nvim-treesitter/nvim-treesitter-context',
+      { 'nvim-treesitter/nvim-treesitter-textobjects', branch = branch },
+      'RRethy/nvim-treesitter-endwise',
     },
-    -- There are additional nvim-treesitter modules that you can use to interact
-    -- with nvim-treesitter. You should go explore a few and see what interests you:
-    --
-    --    - Incremental selection: Included, see `:help nvim-treesitter-incremental-selection-mod`
-    --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
-    --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
+    config = function()
+      set_foldexpr()
+      set_indentexpr()
+
+      require('nvim-treesitter-textobjects').setup {
+        select = {
+          -- Automatically jump forward to textobj, similar to targets.vim
+          lookahead = true,
+          -- You can choose the select mode (default is charwise 'v')
+          --
+          -- Can also be a function which gets passed a table with the keys
+          -- * query_string: eg '@function.inner'
+          -- * method: eg 'v' or 'o'
+          -- and should return the mode ('v', 'V', or '<c-v>') or a table
+          -- mapping query_strings to modes.
+          selection_modes = {
+            ['@parameter.outer'] = 'v', -- charwise
+            ['@function.outer'] = 'V', -- linewise
+            ['@class.outer'] = '<c-v>', -- blockwise
+          },
+          -- If you set this to `true` (default is `false`) then any textobject is
+          -- extended to include preceding or succeeding whitespace. Succeeding
+          -- whitespace has priority in order to act similarly to eg the built-in
+          -- `ap`.
+          --
+          -- Can also be a function which gets passed a table with the keys
+          -- * query_string: eg '@function.inner'
+          -- * selection_mode: eg 'v'
+          -- and should return true of false
+          include_surrounding_whitespace = false,
+        },
+        move = {
+          -- whether to set jumps in the jumplist
+          set_jumps = true,
+        },
+      }
+
+      register {
+        'bash',
+        'cooklang',
+        'css',
+        'csv',
+        'dockerfile',
+        'git_config',
+        'git_rebase',
+        'gitcommit',
+        'gitignore',
+        'go',
+        'gomod',
+        'gosum',
+        'hcl',
+        'html',
+        'javascript',
+        'jq',
+        'json',
+        'lua',
+        'make',
+        'markdown',
+        'nix',
+        'python',
+        'query',
+        'regex',
+        'ruby',
+        'sql',
+        'ssh_config',
+        'svelte',
+        'terraform',
+        'toml',
+        'typescript',
+        'udev',
+        'vim',
+        'vimdoc',
+        'vue',
+        'xml',
+        'yaml',
+      }
+
+      install_and_start()
+    end,
+  },
+  {
+    'nvim-treesitter/nvim-treesitter-context',
+    event = 'BufRead',
+    dependencies = {
+      'nvim-treesitter/nvim-treesitter',
+      event = 'BufRead',
+    },
+    opts = {
+      multiwindow = true,
+    },
   },
 }
--- vim: ts=2 sts=2 sw=2 et

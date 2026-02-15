@@ -2,33 +2,61 @@ return {
   'nvim-neotest/neotest',
   dependencies = {
     'nvim-neotest/nvim-nio',
-    'nvim-neotest/neotest-go',
-    'rouge8/neotest-rust',
     'nvim-lua/plenary.nvim',
-    'antoinemadec/FixCursorHold.nvim',
     'nvim-treesitter/nvim-treesitter',
+    'antoinemadec/FixCursorHold.nvim',
+    'fredrikaverpil/neotest-golang',
   },
-  opts = {},
+  keys = {
+    {
+      '<leader>tt',
+      function()
+        require('neotest').run.run()
+      end,
+      desc = 'Run Test',
+    },
+    {
+      '<leader>tf',
+      function()
+        require('neotest').run.run(vim.fn.expand '%')
+      end,
+      desc = 'Run Test File',
+    },
+    {
+      '<leader>tp',
+      function()
+        require('neotest').output_panel.toggle()
+      end,
+      desc = 'Toggle Test Output Panel',
+    },
+    {
+      '<leader>tl',
+      function()
+        require('neotest').run.run_last()
+      end,
+      desc = 'Run Last Test',
+    },
+    {
+      '<leader>ts',
+      function()
+        require('neotest').summary.toggle()
+      end,
+      desc = 'Toggle Test Summary',
+    },
+  },
   config = function()
     require('neotest').setup {
+      floating = {
+        border = 'rounded',
+        max_height = 0.75,
+        max_width = 0.9,
+        options = {},
+      },
       adapters = {
-        require 'neotest-go',
-        require 'neotest-rust',
-      },
-      output_panel = {
-        enabled = true,
-        open = 'botright split | resize 15',
-      },
-      quickfix = {
-        enabled = true,
-        open = false,
+        require 'neotest-golang' {
+          { dap_go_enabled = true },
+        },
       },
     }
-
-    vim.keymap.set('n', '<leader>tt', "<cmd>lua require('neotest').run.run()<CR>", { desc = 'Run Test' })
-    vim.keymap.set('n', '<leader>tf', "<cmd>lua require('neotest').run.run(vim.fn.expand('%'))<CR>", { desc = 'Run Test File' })
-    vim.keymap.set('n', '<leader>tp', "<cmd>lua require('neotest').output_panel.toggle()<CR>", { desc = 'Toggle Test Output Panel' })
-    vim.keymap.set('n', '<leader>tl', "<cmd>lua require('neotest').run.run_last()<CR>", { desc = 'Run Last Test' })
-    vim.keymap.set('n', '<leader>ts', "<cmd>lua require('neotest').summary.toggle()<CR>", { desc = 'Toggle Test Summary' })
   end,
 }
