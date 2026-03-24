@@ -43,9 +43,21 @@ return {
       end,
       desc = 'Toggle Test Summary',
     },
+    {
+      '<leader>tc',
+      function()
+        require('neotest').output_panel.clear()
+      end,
+      desc = 'Clear Test Output Panel',
+    },
   },
   config = function()
     require('neotest').setup {
+      discovery = {
+        enabled = true,
+        warn_test_names_dupes = false,
+        severity = vim.diagnostic.severity.ERROR,
+      },
       floating = {
         border = 'rounded',
         max_height = 0.75,
