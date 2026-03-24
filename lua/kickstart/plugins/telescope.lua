@@ -29,6 +29,8 @@ return {
 
       -- Useful for getting pretty icons, but requires a Nerd Font.
       { 'nvim-tree/nvim-web-devicons', enabled = vim.g.have_nerd_font },
+      -- Terraform
+      { 'ANGkeith/telescope-terraform-doc.nvim' },
     },
     config = function()
       -- Telescope is a fuzzy finder that comes with a lot of different things that
@@ -116,6 +118,9 @@ return {
           no_ignore = true,
         }
       end, { desc = '[F]ind [I]nvisible files' })
+
+      -- Shortcuts for terraform
+      vim.keymap.set('n', '<leader>ott', ':Telescope terraform_doc<CR>', { desc = 'Terraform documentation' })
     end,
   },
 }
