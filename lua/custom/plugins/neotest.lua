@@ -54,9 +54,7 @@ return {
   config = function()
     require('neotest').setup {
       discovery = {
-        enabled = true,
-        warn_test_names_dupes = false,
-        severity = vim.diagnostic.severity.ERROR,
+        enabled = false,
       },
       floating = {
         border = 'rounded',
